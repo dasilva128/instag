@@ -1,0 +1,4 @@
+# config.py
+TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # توکن ربات تلگرام
+INSTAGRAM_USERNAME = "YOUR_INSTAGRAM_USERNAME"  # نام کاربری اینستاگرام
+INSTAGRAM_PASSWORD = "YOUR_INSTAGRAM_PASSWORD"  # رمز عبور اینستاگرام
