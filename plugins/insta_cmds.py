@@ -10,9 +10,17 @@ OWNER = Config.OWNER
 insta = Config.L
 
 async def validate_instagram_user(username: str) -> Optional[Profile]:
-    """Validate Instagram user and return profile if accessible"""
+    """
+    اعتبارسنجی کاربر اینستاگرام و بازگشت پروفایل در صورت دسترسی
+    
+    Args:
+        username (str): نام کاربری اینستاگرام
+        
+    Returns:
+        Optional[Profile]: پروفایل اینستاگرام یا None
+    """
     try:
-        profile = Profile.from_username(insta.context, username)
+        profile = await get_profile(username)
         if profile.is_private and not profile.followed_by_viewer:
             return None
         return profile
@@ -21,8 +29,15 @@ async def validate_instagram_user(username: str) -> Optional[Profile]:
 
 @Client.on_message(filters.command("posts") & filters.private)
 async def posts_command(bot: Client, message: Message):
+    """
+    مدیریت دستور /posts
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+    """
     if str(message.from_user.id) != OWNER:
-        return
+        return await message.reply("⛔ دسترسی محدود به مالک ربات")
         
     if 1 not in Config.STATUS:
         return await message.reply("🔒 Please /login first")
@@ -47,8 +62,15 @@ async def posts_command(bot: Client, message: Message):
 
 @Client.on_message(filters.command("igtv") & filters.private)
 async def igtv_command(bot: Client, message: Message):
+    """
+    مدیریت دستور /igtv
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+    """
     if str(message.from_user.id) != OWNER:
-        return
+        return await message.reply("⛔ دسترسی محدود به مالک ربات")
         
     if 1 not in Config.STATUS:
         return await message.reply("🔒 Please /login first")
