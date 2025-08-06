@@ -1,8 +1,17 @@
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from typing import List, Optional
+from instaloader import Profile
 
 def create_keyboard(buttons: List[List[dict]]) -> InlineKeyboardMarkup:
-    """Create inline keyboard from button structure"""
+    """
+    ایجاد کیبورد اینلاین از ساختار دکمه‌ها
+    
+    Args:
+        buttons (List[List[dict]]): لیست دکمه‌ها
+        
+    Returns:
+        InlineKeyboardMarkup: کیبورد اینلاین
+    """
     keyboard = []
     for row in buttons:
         keyboard_row = []
@@ -16,8 +25,16 @@ def create_keyboard(buttons: List[List[dict]]) -> InlineKeyboardMarkup:
         keyboard.append(keyboard_row)
     return InlineKeyboardMarkup(keyboard)
 
-def format_user_info(profile) -> str:
-    """Format Instagram profile information"""
+def format_user_info(profile: Profile) -> str:
+    """
+    فرمت‌دهی اطلاعات پروفایل اینستاگرام
+    
+    Args:
+        profile (Profile): نمونه پروفایل اینستاگرام
+        
+    Returns:
+        str: متن فرمت‌شده اطلاعات کاربر
+    """
     return (
         f"👤 **{profile.full_name}** (@{profile.username})\n\n"
         f"📝 **Bio:** {profile.biography}\n"
