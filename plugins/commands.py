@@ -11,15 +11,18 @@ HELP = Config.HELP
 
 @Client.on_message(filters.command("start") & filters.private)
 async def start_command(bot: Client, message: Message):
+    """
+    مدیریت دستور /start
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+    """
     is_owner = str(message.from_user.id) == OWNER
     text = Config.HOME_TEXT_OWNER if is_owner else Config.HOME_TEXT
     text = text.format(
         message.from_user.first_name,
-        message.from_user.id,
-        USER,
-        USER,
-        USER,
-        OWNER
+        USER
     )
     
     buttons = InlineKeyboardMarkup([
@@ -37,6 +40,13 @@ async def start_command(bot: Client, message: Message):
 
 @Client.on_message(filters.command("help") & filters.private)
 async def help_command(bot: Client, message: Message):
+    """
+    مدیریت دستور /help
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+    """
     await message.reply_text(
         HELP,
         reply_markup=InlineKeyboardMarkup([
@@ -50,6 +60,13 @@ async def help_command(bot: Client, message: Message):
 
 @Client.on_message(filters.command("restart") & filters.private)
 async def restart_command(bot: Client, message: Message):
+    """
+    مدیریت دستور /restart
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+    """
     if str(message.from_user.id) != OWNER:
         return await start_command(bot, message)
     
