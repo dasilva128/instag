@@ -14,11 +14,18 @@ STATUS = Config.STATUS
 
 @Client.on_message(filters.command("login") & filters.private)
 async def login_command(bot: Client, message: Message):
+    """
+    مدیریت دستور /login
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+    """
     if str(message.from_user.id) != Config.OWNER:
-        return
+        return await message.reply("⛔ دسترسی محدود به مالک ربات")
         
     if 1 in STATUS:
-        profile = Profile.own_profile(Config.L.context)
+        profile = await safe_instagram_request(Profile.own_profile, Config.L.context)
         return await message.reply_photo(
             photo=profile.profile_pic_url,
             caption=(
@@ -45,7 +52,7 @@ async def login_command(bot: Client, message: Message):
         Config.L.save_session_to_file(filename=f"./{USER}")
         STATUS.add(1)
         
-        profile = Profile.own_profile(Config.L.context)
+        profile = await safe_instagram_request(Profile.own_profile, Config.L.context)
         await message.reply_photo(
             photo=profile.profile_pic_url,
             caption=(
@@ -69,7 +76,7 @@ async def login_command(bot: Client, message: Message):
             Config.L.save_session_to_file(filename=f"./{USER}")
             STATUS.add(1)
             
-            profile = Profile.own_profile(Config.L.context)
+            profile = await safe_instagram_request(Profile.own_profile, Config.L.context)
             await message.reply_photo(
                 photo=profile.profile_pic_url,
                 caption=(
@@ -91,15 +98,21 @@ async def login_command(bot: Client, message: Message):
 
 @Client.on_message(filters.command("logout") & filters.private)
 async def logout_command(bot: Client, message: Message):
+    """
+    مدیریت دستور /logout
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+    """
     if str(message.from_user.id) != Config.OWNER:
-        return
+        return await message.reply("⛔ دسترسی محدود به مالک ربات")
         
     if 1 in STATUS:
         STATUS.remove(1)
-        try:
-            os.remove(f"./{USER}")
-        except:
-            pass
+        session_file = f"./{USER}"
+        if os.path.exists(session_file):
+            os.remove(session_file)
         await message.reply("✅ Successfully logged out")
     else:
         await message.reply("❌ Not currently logged in")
