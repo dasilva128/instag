@@ -6,6 +6,8 @@ from typing import Set
 load_dotenv()
 
 class Config:
+    """تنظیمات ربات و اینستاگرام"""
+    
     # Telegram Config
     API_ID = int(os.getenv("API_ID", 0))
     API_HASH = os.getenv("API_HASH", "")
@@ -18,15 +20,25 @@ class Config:
     
     # Bot Status
     S = "0"
-    STATUS: Set[int] = set(int(x) for x in (S).split())
+    STATUS: Set[int] = set(int(x) for x in S.split())
     
     # Instaloader instance
     L = Instaloader(
         quiet=True,
         download_video_thumbnails=False,
         compress_json=False,
-        save_metadata=False
+        save_metadata=False,
+        max_connection_attempts=3,
+        request_timeout=30
     )
+    
+    # تنظیم پروکسی (در صورت وجود)
+    proxy = os.getenv("INSTA_PROXY")
+    if proxy:
+        L.context._session.proxies = {
+            "http": proxy,
+            "https": proxy
+        }
     
     # Help Text
     HELP = """
