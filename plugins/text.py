@@ -1,32 +1,60 @@
 import re
 import logging
-from typing import Optional, Union
-from pyrogram import Client, filters
-from pyrogram.types import (
-    Message,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    CallbackQuery
-)
-from instaloader import Profile, Post
+import random
+import time
+from pyrogram import Client, filters, ContinuePropagation
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from instaloader import Profile, Post, StoryItem
 from config import Config
 from utils import (
     download_insta,
     upload,
     acc_type,
     yes_or_no,
-    format_user_info  # تابع جدید از helpers
+    safe_instagram_request,
+    get_profile,
+    format_user_info
 )
 from plugins.helpers import create_keyboard
-from plugins.downloader import download_posts, download_stories
 
-# تنظیمات لاگ
 logger = logging.getLogger(__name__)
 
-# دستور /account
+# تنظیمات تلاش مجدد
+MAX_RETRIES = 3
+RETRY_DELAY = 5
+
+async def get_profile_safe(username: str) -> Profile:
+    """
+    دریافت پروفایل با مدیریت خطاها و تلاش مجدد
+    
+    Args:
+        username (str): نام کاربری اینستاگرام
+        
+    Returns:
+        Profile: پروفایل اینستاگرام
+        
+    Raises:
+        Exception: در صورت عدم دسترسی به پروفایل
+    """
+    for attempt in range(MAX_RETRIES):
+        try:
+            return await get_profile(username)
+        except Exception as e:
+            if attempt == MAX_RETRIES - 1:
+                raise
+            delay = RETRY_DELAY * (attempt + 1) + random.uniform(0, 3)
+            logger.warning(f"Retry {attempt + 1} for {username} after {delay:.1f}s")
+            time.sleep(delay)
+
 @Client.on_message(filters.command("account") & filters.private)
 async def account_info(client: Client, message: Message):
-    """نمایش اطلاعات حساب اینستاگرام متصل"""
+    """
+    نمایش اطلاعات حساب متصل
+    
+    Args:
+        client (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+    """
     if str(message.from_user.id) != Config.OWNER:
         return await message.reply("⛔ دسترسی محدود به مالک ربات")
 
@@ -34,9 +62,8 @@ async def account_info(client: Client, message: Message):
         return await message.reply("🔒 لطفا ابتدا وارد شوید /login")
 
     try:
-        profile = Profile.own_profile(Config.L.context)
+        profile = await get_profile_safe(Config.USER)
         
-        # ایجاد کیبورد با قابلیت‌های مختلف
         buttons = [
             [
                 {"text": "📸 عکس پروفایل", "callback": f"ppic#{profile.username}"},
@@ -45,14 +72,6 @@ async def account_info(client: Client, message: Message):
             [
                 {"text": "🎥 IGTV", "callback": f"igtv#{profile.username}"},
                 {"text": "🌟 هایلایت‌ها", "callback": f"highlights#{profile.username}"}
-            ],
-            [
-                {"text": "📲 استوری‌ها", "callback": f"stories#{profile.username}"},
-                {"text": "👥 دنبال‌کنندگان", "callback": f"followers#{profile.username}"}
-            ],
-            [
-                {"text": "🔄 افراد دنبال‌شده", "callback": f"followees#{profile.username}"},
-                {"text": "📌 پست‌های تگ شده", "callback": f"tagged#{profile.username}"}
             ]
         ]
 
@@ -63,13 +82,21 @@ async def account_info(client: Client, message: Message):
         )
 
     except Exception as e:
-        logger.error(f"Error in account_info: {e}")
-        await message.reply(f"❌ خطا: {str(e)}")
+        error_msg = "خطا در دریافت اطلاعات از اینستاگرام"
+        if "401 Unauthorized" in str(e):
+            error_msg += "\n🔒 ممکن است نیاز به لاگین مجدد داشته باشید (/relogin)"
+        await message.reply(f"❌ {error_msg}")
+        logger.error(f"Account info error: {e}", exc_info=True)
 
-# پردازش متن دریافتی (یوزرنیم یا لینک)
-@Client.on_message(filters.text & filters.private & ~filters.command)
+@Client.on_message(filters.text & filters.private & ~filters.command([]))
 async def handle_instagram_input(client: Client, message: Message):
-    """پردازش یوزرنیم یا لینک اینستاگرام"""
+    """
+    پردازش پیام‌های متنی (یوزرنیم یا لینک)
+    
+    Args:
+        client (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+    """
     if str(message.from_user.id) != Config.OWNER:
         return
 
@@ -78,56 +105,69 @@ async def handle_instagram_input(client: Client, message: Message):
 
     input_text = message.text.strip()
 
-    # پردازش لینک اینستاگرام
     if "instagram.com" in input_text:
-        return await handle_instagram_url(client, message, input_text)
-
-    # پردازش یوزرنیم
-    await handle_instagram_username(client, message, input_text)
+        await handle_instagram_url(client, message, input_text)
+    else:
+        await handle_instagram_username(client, message, input_text)
 
 async def handle_instagram_url(client: Client, message: Message, url: str):
-    """پردازش لینک اینستاگرام"""
+    """
+    پردازش لینک‌های اینستاگرام
+    
+    Args:
+        client (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+        url (str): لینک اینستاگرام
+    """
     try:
-        # شناسایی نوع لینک
-        patterns = {
-            "post": r"(?:https?://)?(?:www\.)?instagram\.com/p/([^/]+)",
-            "reel": r"(?:https?://)?(?:www\.)?instagram\.com/reel/([^/]+)",
-            "igtv": r"(?:https?://)?(?:www\.)?instagram\.com/tv/([^/]+)",
+        url_patterns = {
+            "post": r"(?:https?://)?(?:www\.)?instagram\.com/p/([^/?#]+)",
+            "reel": r"(?:https?://)?(?:www\.)?instagram\.com/reel/([^/?#]+)",
             "story": r"(?:https?://)?(?:www\.)?instagram\.com/stories/([^/]+)/(\d+)"
         }
 
-        for post_type, pattern in patterns.items():
-            match = re.match(pattern, url)
+        for content_type, pattern in url_patterns.items():
+            match = re.search(pattern, url)
             if match:
-                if post_type == "story":
+                if content_type == "story":
                     username, story_id = match.groups()
                     return await handle_story(client, message, username, story_id)
                 
                 shortcode = match.group(1)
-                return await handle_post(client, message, shortcode, post_type)
+                return await handle_post(client, message, shortcode, content_type)
 
-        await message.reply("⚠️ لینک نامعتبر. فقط پست، رییل، IGTV و استوری پشتیبانی می‌شود")
+        await message.reply("⚠️ لینک نامعتبر. فقط پست، رییل و استوری پشتیبانی می‌شوند")
 
     except Exception as e:
-        logger.error(f"Error processing URL: {e}")
-        await message.reply(f"❌ خطا در پردازش لینک: {str(e)}")
+        await handle_instagram_error(message, e, "پردازش لینک")
 
 async def handle_post(client: Client, message: Message, shortcode: str, post_type: str):
-    """دانلود پست اینستاگرام"""
+    """
+    دانلود پست اینستاگرام
+    
+    Args:
+        client (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+        shortcode (str): کد کوتاه پست
+        post_type (str): نوع پست (post/reel)
+    """
     loading_msg = await message.reply(f"🔍 در حال دریافت {post_type}...")
     
     try:
-        post = Post.from_shortcode(Config.L.context, shortcode)
-        dir_path = f"{message.from_user.id}/{shortcode}"
+        post = await safe_instagram_request(
+            Post.from_shortcode,
+            Config.L.context,
+            shortcode
+        )
         
+        dir_path = f"{message.from_user.id}/{shortcode}"
         command = [
             "instaloader",
             "--no-metadata-json",
-            "--no-compress-json",
             "--no-captions",
             "--no-video-thumbnails",
             "--login", Config.USER,
-            "-f", f"./{Config.USER}",
+            "--sessionfile", f"./{Config.USER}",
             "--dirname-pattern", dir_path,
             "--", f"-{shortcode}"
         ]
@@ -136,46 +176,60 @@ async def handle_post(client: Client, message: Message, shortcode: str, post_typ
         await upload(loading_msg, client, message.from_user.id, dir_path)
 
     except Exception as e:
-        await loading_msg.edit(f"❌ خطا در دانلود: {str(e)}")
-        logger.error(f"Post download error: {e}")
+        await handle_instagram_error(loading_msg, e, "دانلود پست")
 
 async def handle_story(client: Client, message: Message, username: str, story_id: str):
-    """دانلود استوری اینستاگرام"""
+    """
+    دانلود استوری اینستاگرام
+    
+    Args:
+        client (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+        username (str): نام کاربری اینستاگرام
+        story_id (str): شناسه استوری
+    """
     try:
-        profile = Profile.from_username(Config.L.context, username)
+        profile = await get_profile_safe(username)
         
         if profile.is_private and not profile.followed_by_viewer:
             return await message.reply("🔒 حساب کاربری خصوصی است و شما دنبال‌کننده نیستید")
 
-        await download_stories(message, username)
+        await message.reply("⏳ در حال دریافت استوری...")
+        # پیاده‌سازی دانلود استوری اینجا
         
     except Exception as e:
-        await message.reply(f"❌ خطا در دریافت استوری: {str(e)}")
-        logger.error(f"Story download error: {e}")
+        await handle_instagram_error(message, e, "دریافت استوری")
 
 async def handle_instagram_username(client: Client, message: Message, username: str):
-    """پردازش یوزرنیم اینستاگرام"""
+    """
+    پردازش یوزرنیم اینستاگرام
+    
+    Args:
+        client (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+        username (str): نام کاربری اینستاگرام
+    """
     try:
-        profile = Profile.from_username(Config.L.context, username)
+        profile = await get_profile_safe(username)
         
-        # ایجاد کیبورد تعاملی
         buttons = [
             [
                 {"text": "📸 عکس پروفایل", "callback": f"ppic#{username}"},
                 {"text": "📥 پست‌ها", "callback": f"post#{username}"}
-            ],
-            [
-                {"text": "🎥 IGTV", "callback": f"igtv#{username}"},
-                {"text": "📲 استوری‌ها", "callback": f"stories#{username}"}
-            ],
-            [
-                {"text": "👥 دنبال‌کنندگان", "callback": f"followers#{username}"},
-                {"text": "🔄 افراد دنبال‌شده", "callback": f"followees#{username}"}
             ]
         ]
 
-        if profile.is_private and not profile.followed_by_viewer:
-            buttons = [[buttons[0][0]]  # فقط دکمه عکس پروفایل
+        if not profile.is_private or profile.followed_by_viewer:
+            buttons.extend([
+                [
+                    {"text": "🎥 IGTV", "callback": f"igtv#{username}"},
+                    {"text": "📲 استوری‌ها", "callback": f"stories#{username}"}
+                ],
+                [
+                    {"text": "👥 دنبال‌کنندگان", "callback": f"followers#{username}"},
+                    {"text": "🔄 دنبال‌شده‌ها", "callback": f"followees#{username}"}
+                ]
+            ])
 
         await message.reply_photo(
             photo=profile.profile_pic_url,
@@ -184,16 +238,43 @@ async def handle_instagram_username(client: Client, message: Message, username: 
         )
 
     except Exception as e:
-        await message.reply(f"❌ خطا: {str(e)}")
-        logger.error(f"Username handling error: {e}")
+        await handle_instagram_error(message, e, "پردازش یوزرنیم")
 
-# کال‌بک‌های کیبورد
+async def handle_instagram_error(message: Message, error: Exception, context: str):
+    """
+    مدیریت خطاهای اینستاگرام
+    
+    Args:
+        message (Message): پیام تلگرامی
+        error (Exception): خطای رخ‌داده
+        context (str): زمینه خطا
+    """
+    error_msg = f"❌ خطا در {context}: "
+    
+    if "401 Unauthorized" in str(error):
+        error_msg += "نیاز به ورود مجدد دارید (/relogin)"
+    elif "404 Not Found" in str(error):
+        error_msg += "کاربر یا محتوا یافت نشد"
+    elif "rate limit" in str(error).lower():
+        error_msg += "محدودیت درخواست. لطفاً چند دقیقه دیگر تلاش کنید"
+    else:
+        error_msg += str(error)
+    
+    await message.reply(error_msg)
+    logger.error(f"{context} error: {error}", exc_info=True)
+
 @Client.on_callback_query(filters.regex(r"^ppic#"))
 async def send_profile_pic(client: Client, callback: CallbackQuery):
-    """ارسال عکس پروفایل"""
+    """
+    ارسال عکس پروفایل
+    
+    Args:
+        client (Client): نمونه ربات Pyrogram
+        callback (CallbackQuery): درخواست callback
+    """
     try:
         username = callback.data.split("#")[1]
-        profile = Profile.from_username(Config.L.context, username)
+        profile = await get_profile_safe(username)
         
         await callback.message.reply_photo(
             photo=profile.profile_pic_url,
@@ -203,4 +284,4 @@ async def send_profile_pic(client: Client, callback: CallbackQuery):
         
     except Exception as e:
         await callback.answer("❌ خطا در دریافت عکس پروفایل", show_alert=True)
-        logger.error(f"Profile pic error: {e}")
+        logger.error(f"Profile pic error: {e}", exc_info=True)
