@@ -1,22 +1,25 @@
-# main.py
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-from bot.handlers import BotHandlers
-from config import TELEGRAM_BOT_TOKEN
+from pyrogram import Client, idle
+from config import Config
 
-def main():
-    updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
-    handlers = BotHandlers()
+bot = Client(
+    "InstaSession",
+    bot_token=Config.BOT_TOKEN,
+    api_id=Config.API_ID,
+    api_hash=Config.API_HASH,
+    workers=50,
+    plugins=dict(root="plugins")
+)
 
-    # افزودن هندلرها
-    dp.add_handler(CommandHandler("start", handlers.start))
-    dp.add_handler(CommandHandler("posts", handlers.download_posts))
-    dp.add_handler(CommandHandler("stories", handlers.download_stories))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handlers.handle_link))
-
-    # شروع ربات
-    updater.start_polling()
-    updater.idle()
+async def main():
+    try:
+        async with bot:
+            if Config.INSTA_SESSIONFILE_ID:
+                await bot.download_media(Config.INSTA_SESSIONFILE_ID, file_name=f"./{Config.USER}")
+                Config.L.load_session_from_file(Config.USER, filename=f"./{Config.USER}")
+                Config.STATUS.add(1)
+            await idle()
+    except Exception as e:
+        print(f"Error in main: {e}")
 
 if __name__ == "__main__":
-    main()
+    bot.run(main())
