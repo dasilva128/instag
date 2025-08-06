@@ -13,11 +13,26 @@ STATUS = Config.STATUS
 insta = Config.L
 
 async def parse_callback_data(data: str) -> Tuple[str, str]:
-    """Split callback data into command and username"""
+    """
+    تجزیه داده‌های callback به دستور و نام کاربری
+    
+    Args:
+        data (str): داده callback
+        
+    Returns:
+        Tuple[str, str]: دستور و نام کاربری
+    """
     return data.split("#", 1) if "#" in data else (data, "")
 
 @Client.on_callback_query(filters.regex(r"^help"))
 async def help_callback(bot: Client, query: CallbackQuery):
+    """
+    نمایش پیام راهنما
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        query (CallbackQuery): درخواست callback
+    """
     await query.message.edit_text(
         HELP,
         reply_markup=InlineKeyboardMarkup([
@@ -33,17 +48,35 @@ async def help_callback(bot: Client, query: CallbackQuery):
 
 @Client.on_callback_query(filters.regex(r"^ppic#"))
 async def profile_pic_callback(bot: Client, query: CallbackQuery):
+    """
+    دانلود و ارسال عکس پروفایل
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        query (CallbackQuery): درخواست callback
+    """
     cmd, username = await parse_callback_data(query.data)
-    profile = Profile.from_username(insta.context, username)
-    await query.answer("Downloading profile picture...")
-    await bot.send_photo(
-        query.from_user.id,
-        photo=profile.profile_pic_url,
-        caption=f"📸 Profile picture of @{username}"
-    )
+    try:
+        profile = await get_profile(username)
+        await query.answer("Downloading profile picture...")
+        await bot.send_photo(
+            query.from_user.id,
+            photo=profile.profile_pic_url,
+            caption=f"📸 Profile picture of @{username}"
+        )
+    except Exception as e:
+        await query.answer(f"❌ Error: {e}", show_alert=True)
+        logger.error(f"Profile pic error: {e}")
 
 @Client.on_callback_query(filters.regex(r"^(post|photo|video|igtv|tagged|stories|highlights)#"))
 async def content_callback(bot: Client, query: CallbackQuery):
+    """
+    مدیریت درخواست‌های دانلود محتوا
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        query (CallbackQuery): درخواست callback
+    """
     cmd, username = await parse_callback_data(query.data)
     
     if cmd == "post":
@@ -94,4 +127,11 @@ async def content_callback(bot: Client, query: CallbackQuery):
 
 @Client.on_callback_query(filters.regex(r"^close"))
 async def close_callback(bot: Client, query: CallbackQuery):
+    """
+    حذف پیام در پاسخ به callback بسته شدن
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        query (CallbackQuery): درخواست callback
+    """
     await query.message.delete()
