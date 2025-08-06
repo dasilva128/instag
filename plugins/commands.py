@@ -1,94 +1,59 @@
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from config import Config
-import asyncio
 import sys
 import os
+from typing import Optional
 
 USER = Config.USER
 OWNER = Config.OWNER
-HOME_TEXT = Config.HOME_TEXT
-HOME_TEXT_OWNER = Config.HOME_TEXT_OWNER
 HELP = Config.HELP
 
 @Client.on_message(filters.command("start") & filters.private)
-async def start(bot, cmd):
-    if str(cmd.from_user.id) != OWNER:
-        await cmd.reply_text(
-            HOME_TEXT.format(cmd.from_user.first_name, cmd.from_user.id, USER, USER, USER, OWNER),
-            disable_web_page_preview=True,
-            reply_markup=InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("👨🏼‍💻 Developer", url='https://t.me/savior_128'),
-                    InlineKeyboardButton("🤖 Other Bots", url="https://t.me/savior_128")
-                ],
-                [
-                    InlineKeyboardButton("🔗 Source Code", url="https://github.com/savior_128/Instagram-Bot"),
-                    InlineKeyboardButton("⚙️ Update Channel", url="https://t.me/savior_128")
-                ],
-                [
-                    InlineKeyboardButton("👨🏼‍🦯 How To Use?", callback_data="help#subin")
-                ]
-            ])
-        )
-    else:
-        await cmd.reply_text(
-            HOME_TEXT_OWNER.format(cmd.from_user.first_name, cmd.from_user.id),
-            disable_web_page_preview=True,
-            reply_markup=InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("👨🏼‍💻 Developer", url='https://t.me/savior_128'),
-                    InlineKeyboardButton("🤖 Other Bots", url="https://t.me/savior_128")
-                ],
-                [
-                    InlineKeyboardButton("🔗 Source Code", url="https://github.com/savior_128/Instagram-Bot"),
-                    InlineKeyboardButton("⚙️ Update Channel", url="https://t.me/savior_128")
-                ],
-                [
-                    InlineKeyboardButton("👨🏼‍🦯 How To Use?", callback_data="help#subin")
-                ]
-            ])
-        )
+async def start_command(bot: Client, message: Message):
+    is_owner = str(message.from_user.id) == OWNER
+    text = Config.HOME_TEXT_OWNER if is_owner else Config.HOME_TEXT
+    text = text.format(
+        message.from_user.first_name,
+        message.from_user.id,
+        USER,
+        USER,
+        USER,
+        OWNER
+    )
+    
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🆘 Help", callback_data="help"),
+            InlineKeyboardButton("🔒 Close", callback_data="close")
+        ]
+    ])
+    
+    await message.reply_text(
+        text,
+        reply_markup=buttons,
+        disable_web_page_preview=True
+    )
 
 @Client.on_message(filters.command("help") & filters.private)
-async def help(bot, cmd):
-    await cmd.reply_text(
+async def help_command(bot: Client, message: Message):
+    await message.reply_text(
         HELP,
-        disable_web_page_preview=True,
         reply_markup=InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("👨🏼‍💻 Developer", url='https://t.me/savior_128'),
-                InlineKeyboardButton("🤖 Other Bots", url="https://t.me/savior_128"),
-                InlineKeyboardButton("⚙️ Update Channel", url="https://t.me/savior_128")
-            ],
-            [
-                InlineKeyboardButton("🔗 Source Code", url="https://github.com/savior_128/Instagram-Bot")
+                InlineKeyboardButton("🔙 Back", callback_data="back"),
+                InlineKeyboardButton("🔒 Close", callback_data="close")
             ]
-        ])
+        ]),
+        disable_web_page_preview=True
     )
 
 @Client.on_message(filters.command("restart") & filters.private)
-async def restart(bot, cmd):
-    if str(cmd.from_user.id) != OWNER:
-        await cmd.reply_text(
-            HOME_TEXT.format(cmd.from_user.first_name, cmd.from_user.id, USER, USER, USER, OWNER),
-            disable_web_page_preview=True,
-            reply_markup=InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("👨🏼‍💻 Developer", url='https://t.me/savior_128'),
-                    InlineKeyboardButton("🤖 Other Bots", url="https://t.me/savior_128")
-                ],
-                [
-                    InlineKeyboardButton("🔗 Source Code", url="https://github.com/savior_128/Instagram-Bot"),
-                    InlineKeyboardButton("⚙️ Update Channel", url="https://t.me/savior_128")
-                ],
-                [
-                    InlineKeyboardButton("👨🏼‍🦯 How To Use?", callback_data="help#subin")
-                ]
-            ])
-        )
-        return
-    msg = await bot.send_message(chat_id=cmd.from_user.id, text="Restarting your bot...")
+async def restart_command(bot: Client, message: Message):
+    if str(message.from_user.id) != OWNER:
+        return await start_command(bot, message)
+    
+    msg = await message.reply("🔄 Restarting bot...")
     await asyncio.sleep(2)
-    await msg.edit("All processes stopped and restarted.")
+    await msg.edit("✅ Bot restarted successfully!")
     os.execl(sys.executable, sys.executable, *sys.argv)
