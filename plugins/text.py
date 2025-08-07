@@ -84,7 +84,7 @@ async def account_info(client: Client, message: Message):
     except Exception as e:
         error_msg = "خطا در دریافت اطلاعات از اینستاگرام"
         if "401 Unauthorized" in str(e):
-            error_msg += "\n🔒 ممکن است نیاز به لاگین مجدد داشته باشید (/relogin)"
+            error_msg += "\n🔒 ممکن است نیاز به لاگین مجدد داشته باشید (/login)"
         await message.reply(f"❌ {error_msg}")
         logger.error(f"Account info error: {e}", exc_info=True)
 
@@ -190,13 +190,28 @@ async def handle_story(client: Client, message: Message, username: str, story_id
     """
     try:
         profile = await get_profile_safe(username)
-        
         if profile.is_private and not profile.followed_by_viewer:
             return await message.reply("🔒 حساب کاربری خصوصی است و شما دنبال‌کننده نیستید")
 
-        await message.reply("⏳ در حال دریافت استوری...")
-        # پیاده‌سازی دانلود استوری اینجا
+        loading_msg = await message.reply("⏳ در حال دریافت استوری...")
         
+        dir_path = f"{message.from_user.id}/{username}_story_{story_id}"
+        command = [
+            "instaloader",
+            "--no-metadata-json",
+            "--no-compress-json",
+            "--no-captions",
+            "--no-video-thumbnails",
+            "--login", Config.USER,
+            "-f", f"./{Config.USER}",
+            "--dirname-pattern", dir_path,
+            "--stories",
+            "--", username
+        ]
+
+        await download_insta(command, loading_msg, dir_path)
+        await upload(loading_msg, client, message.from_user.id, dir_path)
+
     except Exception as e:
         await handle_instagram_error(message, e, "دریافت استوری")
 
@@ -252,7 +267,7 @@ async def handle_instagram_error(message: Message, error: Exception, context: st
     error_msg = f"❌ خطا در {context}: "
     
     if "401 Unauthorized" in str(error):
-        error_msg += "نیاز به ورود مجدد دارید (/relogin)"
+        error_msg += "نیاز به ورود مجدد دارید (/login)"
     elif "404 Not Found" in str(error):
         error_msg += "کاربر یا محتوا یافت نشد"
     elif "rate limit" in str(error).lower():
