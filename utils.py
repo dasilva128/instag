@@ -3,7 +3,7 @@ import shutil
 import glob
 import pytz
 from datetime import datetime
-from typing import Optional, List, Callable, Any
+from typing import Optional, List, Callable
 from pyrogram.types import (
     InputMediaPhoto, 
     InputMediaVideo, 
@@ -14,7 +14,6 @@ from pyrogram.types import (
 from pyrogram import Client
 from videoprops import get_audio_properties
 from config import Config
-import random
 import logging
 from instaloader import Profile, Post
 from pyrogram.errors import FloodWait
@@ -142,8 +141,11 @@ async def upload(
     except Exception as e:
         await message.edit(f"❌ Upload failed: {e}")
     finally:
-        if os.path.exists(directory):
-            shutil.rmtree(directory, ignore_errors=True)
+        try:
+            if os.path.exists(directory):
+                shutil.rmtree(directory, ignore_errors=True)
+        except Exception as e:
+            logger.error(f"Failed to remove directory {directory}: {e}")
 
 def acc_type(is_private: bool) -> str:
     """
@@ -192,10 +194,10 @@ def format_user_info(profile: Profile) -> str:
 
 async def safe_instagram_request(
     func: Callable,
-    *args: Any,
+    *args,
     max_retries: int = 3,
     initial_delay: float = 2.0,
-    **kwargs: Any
+    **kwargs
 ) -> Any:
     """
     اجرای ایمن درخواست‌های اینستاگرام با قابلیت تلاش مجدد
