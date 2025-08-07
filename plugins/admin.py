@@ -55,10 +55,13 @@ async def clean_command(bot: Client, message: Message):
         await message.reply("⛔ دسترسی محدود به مالک ربات")
         return
         
-    import shutil
     cache_path = f"./{Config.USER}"
-    if os.path.exists(cache_path):
-        shutil.rmtree(cache_path, ignore_errors=True)
-        await message.reply("🧹 Cache cleaned successfully!")
-    else:
-        await message.reply("🧹 No cache found to clean")
+    try:
+        if os.path.exists(cache_path):
+            shutil.rmtree(cache_path, ignore_errors=True)
+            await message.reply("🧹 Cache cleaned successfully!")
+        else:
+            await message.reply("🧹 No cache found to clean")
+    except Exception as e:
+        await message.reply(f"❌ Error cleaning cache: {e}")
+        logger.error(f"Cache cleaning error: {e}")
