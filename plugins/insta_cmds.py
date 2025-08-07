@@ -95,3 +95,75 @@ async def igtv_command(bot: Client, message: Message):
             ]
         ])
     )
+
+@Client.on_message(filters.command("followers") & filters.private)
+async def followers_command(bot: Client, message: Message):
+    """
+    مدیریت دستور /followers
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+    """
+    if str(message.from_user.id) != OWNER:
+        return await message.reply("⛔ دسترسی محدود به مالک ربات")
+        
+    if 1 not in Config.STATUS:
+        return await message.reply("🔒 Please /login first")
+    
+    username = USER
+    if " " in message.text:
+        username = message.text.split(" ", 1)[1].strip()
+    
+    profile = await validate_instagram_user(username)
+    if not profile:
+        return await message.reply("❌ Private account or invalid username")
+    
+    try:
+        followers = [user.username for user in profile.get_followers()]
+        if not followers:
+            return await message.reply(f"❌ No followers found for @{username}")
+        
+        followers_text = f"📋 **Followers for @{username}**\n\n" + "\n".join(followers[:50])
+        await message.reply(followers_text, reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔒 Close", callback_data="close")]
+        ]))
+    except Exception as e:
+        await message.reply(f"❌ Error fetching followers: {e}")
+        logger.error(f"Followers error: {e}")
+
+@Client.on_message(filters.command("followees") & filters.private)
+async def followees_command(bot: Client, message: Message):
+    """
+    مدیریت دستور /followees
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        message (Message): پیام تلگرامی
+    """
+    if str(message.from_user.id) != OWNER:
+        return await message.reply("⛔ دسترسی محدود به مالک ربات")
+        
+    if 1 not in Config.STATUS:
+        return await message.reply("🔒 Please /login first")
+    
+    username = USER
+    if " " in message.text:
+        username = message.text.split(" ", 1)[1].strip()
+    
+    profile = await validate_instagram_user(username)
+    if not profile:
+        return await message.reply("❌ Private account or invalid username")
+    
+    try:
+        followees = [user.username for user in profile.get_followees()]
+        if not followees:
+            return await message.reply(f"❌ No followees found for @{username}")
+        
+        followees_text = f"📋 **Followees for @{username}**\n\n" + "\n".join(followees[:50])
+        await message.reply(followees_text, reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔒 Close", callback_data="close")]
+        ]))
+    except Exception as e:
+        await message.reply(f"❌ Error fetching followees: {e}")
+        logger.error(f"Followees error: {e}")
