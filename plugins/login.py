@@ -111,8 +111,12 @@ async def logout_command(bot: Client, message: Message):
     if 1 in STATUS:
         STATUS.remove(1)
         session_file = f"./{USER}"
-        if os.path.exists(session_file):
-            os.remove(session_file)
-        await message.reply("✅ Successfully logged out")
+        try:
+            if os.path.exists(session_file):
+                os.remove(session_file)
+            await message.reply("✅ Successfully logged out")
+        except Exception as e:
+            await message.reply(f"❌ Error logging out: {e}")
+            logger.error(f"Logout error: {e}")
     else:
         await message.reply("❌ Not currently logged in")
