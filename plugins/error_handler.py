@@ -1,6 +1,6 @@
-from pyrogram import Client
+from pyrogram import Client, filters
 from pyrogram.errors import FloodWait, RPCError, BadRequest, Unauthorized
-from pyrogram import ContinuePropagation
+from instaloader import ConnectionException, LoginRequiredException
 import logging
 import asyncio
 
@@ -16,6 +16,7 @@ async def error_handler(client: Client, message):
         message (Message): پیام تلگرامی
     """
     try:
+        # اجازه دادن به پردازش پیام توسط هندلرهای دیگر
         raise ContinuePropagation
     except FloodWait as e:
         logger.warning(f"Flood wait: Sleeping for {e.value} seconds")
@@ -27,6 +28,12 @@ async def error_handler(client: Client, message):
     except Unauthorized:
         logger.error("Unauthorized access attempt")
         await message.reply("❌ دسترسی غیرمجاز. لطفاً ابتدا وارد شوید.")
+    except ConnectionException as e:
+        logger.error(f"Instaloader connection error: {e}")
+        await message.reply("❌ خطای اتصال به اینستاگرام. لطفاً بعداً تلاش کنید.")
+    except LoginRequiredException:
+        logger.error("Login required")
+        await message.reply("❌ نیاز به ورود مجدد دارید. از /login استفاده کنید.")
     except RPCError as e:
         logger.error(f"RPC error: {e}")
         await message.reply(f"❌ خطای API تلگرام: {e}")
