@@ -68,7 +68,7 @@ async def profile_pic_callback(bot: Client, query: CallbackQuery):
         await query.answer(f"❌ Error: {e}", show_alert=True)
         logger.error(f"Profile pic error: {e}")
 
-@Client.on_callback_query(filters.regex(r"^(post|photo|video|igtv|tagged|stories|highlights)#"))
+@Client.on_callback_query(filters.regex(r"^(post|photo|video|igtv|tagged|stories|highlights|followers|followees)#"))
 async def content_callback(bot: Client, query: CallbackQuery):
     """
     مدیریت درخواست‌های دانلود محتوا
@@ -91,6 +91,10 @@ async def content_callback(bot: Client, query: CallbackQuery):
                 ]
             ])
         )
+        return
+    
+    if cmd in ("followers", "followees"):
+        await handle_followers_followees(bot, query, cmd, username)
         return
     
     m = await query.message.edit_text(f"⏳ Preparing {cmd} from @{username}...")
@@ -124,6 +128,41 @@ async def content_callback(bot: Client, query: CallbackQuery):
     
     await download_insta(command, m, dir_path)
     await upload(m, bot, query.from_user.id, dir_path)
+
+async def handle_followers_followees(bot: Client, query: CallbackQuery, cmd: str, username: str):
+    """
+    مدیریت درخواست‌های followers و followees
+    
+    Args:
+        bot (Client): نمونه ربات Pyrogram
+        query (CallbackQuery): درخواست callback
+        cmd (str): نوع درخواست (followers یا followees)
+        username (str): نام کاربری اینستاگرام
+    """
+    try:
+        profile = await get_profile(username)
+        if profile.is_private and not profile.followed_by_viewer:
+            await query.message.edit("🔒 حساب خصوصی است و شما دنبال‌کننده نیستید")
+            return
+        
+        users = []
+        if cmd == "followers":
+            users = [user.username for user in profile.get_followers()]
+        elif cmd == "followees":
+            users = [user.username for user in profile.get_followees()]
+        
+        if not users:
+            await query.message.edit(f"❌ No {cmd} found for @{username}")
+            return
+        
+        users_text = f"📋 **{cmd.capitalize()} for @{username}**\n\n" + "\n".join(users[:50])
+        await query.message.edit(users_text, reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔒 Close", callback_data="close")]
+        ]))
+        
+    except Exception as e:
+        await query.message.edit(f"❌ Error fetching {cmd}: {e}")
+        logger.error(f"Error fetching {cmd}: {e}")
 
 @Client.on_callback_query(filters.regex(r"^close"))
 async def close_callback(bot: Client, query: CallbackQuery):
