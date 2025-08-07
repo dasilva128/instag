@@ -4,6 +4,9 @@ from pyrogram.types import Message
 from config import Config
 from utils import download_insta, upload, safe_instagram_request, get_profile
 from instaloader import Profile, StoryItem, Highlight, Post
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def download_posts(
     message: Message,
