@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import sys
+import os
 from pyrogram import Client, idle
 from pyrogram.errors import PeerIdInvalid, FloodWait, RPCError
 from config import Config
@@ -30,7 +31,7 @@ async def initialize_bot():
         api_hash=Config.API_HASH,
         bot_token=Config.BOT_TOKEN,
         plugins=dict(root="plugins"),
-        workers=50,  # کاهش تعداد workers برای بهبود عملکرد
+        workers=20,  # کاهش تعداد workers برای بهبود عملکرد
         sleep_threshold=180,
         in_memory=True
     )
@@ -81,6 +82,9 @@ async def setup_instagram_session(bot: Client) -> None:
         except Exception as e:
             logger.error(f"Failed to load Instagram session: {e}")
             raise
+        finally:
+            if os.path.exists(session_file):
+                os.remove(session_file)  # حذف فایل جلسه پس از استفاده
 
 async def notify_owner(bot: Client) -> None:
     """
